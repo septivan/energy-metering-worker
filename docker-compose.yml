@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: energy-metering-db
+    environment:
+      POSTGRES_DB: energy_metering
+      POSTGRES_USER: energy_user
+      POSTGRES_PASSWORD: energy_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U energy_user -d energy_metering"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: energy-metering-mq
+    environment:
+      RABBITMQ_DEFAULT_USER: energy_user
+      RABBITMQ_DEFAULT_PASS: energy_pass
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: energy-metering-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME: energy-metering-worker
+      DATABASE_URL: postgres://energy_user:energy_pass@postgres:5432/energy_metering?sslmode=disable
+      RABBITMQ_URL: amqp://energy_user:energy_pass@rabbitmq:5672/
+      RABBITMQ_INGEST_EXCHANGE: energy-metering.ingest.exchange
+      RABBITMQ_INGEST_QUEUE: energy-metering.ingest.queue
+      RABBITMQ_INGEST_ROUTING_KEY: meter.reading.ingested
+      RABBITMQ_WORKER_EXCHANGE: energy-metering.worker.events.exchange
+      RABBITMQ_DLQ_QUEUE: energy-metering.ingest.dlq
+      RABBITMQ_PREFETCH: 10
+      VALIDATION_TIMESTAMP_TOLERANCE_MINUTES: 10080
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
