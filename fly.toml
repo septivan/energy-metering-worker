@@ -1,34 +1,23 @@
-# Fly.io deployment configuration for energy-metering-worker
-app = "energy-metering-worker"
-primary_region = "sin"
+# fly.toml app configuration file generated for energy-metering-worker on 2025-12-31T09:17:25Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'energy-metering-worker'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
 
-[env]
-  SERVICE_NAME = "energy-metering-worker"
-  RABBITMQ_INGEST_EXCHANGE = "energy-metering.ingest.exchange"
-  RABBITMQ_INGEST_QUEUE = "energy-metering.ingest.queue"
-  RABBITMQ_INGEST_ROUTING_KEY = "meter.reading.ingested"
-  RABBITMQ_WORKER_EXCHANGE = "energy-metering.worker.events.exchange"
-  RABBITMQ_DLQ_QUEUE = "energy-metering.ingest.dlq"
-  RABBITMQ_PREFETCH = "10"
-
-[deploy]
-  strategy = "rolling"
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
 [[vm]]
-  cpu_kind = "shared"
+  memory = '1gb'
+  cpu_kind = 'shared'
   cpus = 1
-  memory_mb = 256
-
-# Health checks are not needed for background workers
-# but you can add them if you add an HTTP health endpoint
-
-# Scale configuration
-[processes]
-  worker = ""
-
-# Set secrets with: fly secrets set
-# fly secrets set DATABASE_URL="postgres://..."
-# fly secrets set RABBITMQ_URL="amqps://..."
+  memory_mb = 1024
